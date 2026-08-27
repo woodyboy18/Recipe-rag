@@ -1,0 +1,22 @@
+[
+  {
+    "query": "show me recipe with strawberry and milk",
+    "mode": "find",
+    "expected_mode": "retrieved"
+  },
+  {
+    "query": "create a new dessert with strawberry and milk but no eggs",
+    "mode": "novel",
+    "expected_mode": "synthesized"
+  },
+  {
+    "query": "make a high protein oats breakfast without milk",
+    "mode": "auto",
+    "expected_mode": "auto"
+  },
+  {
+    "query": "unique dinner recipe using chicken and paneer",
+    "mode": "novel",
+    "expected_mode": "synthesized"
+  }
+]

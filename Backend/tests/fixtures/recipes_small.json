@@ -1,0 +1,57 @@
+[
+  {
+    "recipe_id": 1,
+    "title": "Strawberry Smoothie",
+    "ingredients": ["1 cup strawberry", "1 cup milk", "1 tbsp honey"],
+    "normalized_ingredients": ["strawberry", "milk", "honey"],
+    "instructions": ["Add strawberry, milk, and honey to a blender.", "Blend until smooth and chilled.", "Serve cold."],
+    "normalized_actions": ["blend", "chill"],
+    "servings": 2,
+    "prep_time": 5,
+    "cook_time": 0
+  },
+  {
+    "recipe_id": 2,
+    "title": "Strawberry Oat Bars",
+    "ingredients": ["1.5 cups strawberry", "1 cup oats", "1 cup flour", "0.5 cup butter"],
+    "normalized_ingredients": ["strawberry", "oats", "flour", "butter"],
+    "instructions": ["Mix oats, flour, and butter to make crust.", "Layer fresh strawberry on top.", "Bake at 350F for 25 minutes."],
+    "normalized_actions": ["mix", "bake"],
+    "servings": 4,
+    "prep_time": 15,
+    "cook_time": 25
+  },
+  {
+    "recipe_id": 3,
+    "title": "Vanilla Milk Pudding",
+    "ingredients": ["2 cups milk", "1 tsp vanilla", "0.5 cup sugar", "2 tbsp cornstarch"],
+    "normalized_ingredients": ["milk", "vanilla", "sugar", "cornstarch"],
+    "instructions": ["Whisk milk, sugar, vanilla and cornstarch in a saucepan.", "Simmer until thickened.", "Chill in refrigerator."],
+    "normalized_actions": ["whisk", "simmer", "chill"],
+    "servings": 3,
+    "prep_time": 10,
+    "cook_time": 15
+  },
+  {
+    "recipe_id": 4,
+    "title": "Egg Cake",
+    "ingredients": ["2 eggs", "1 cup milk", "1.5 cups flour", "1 cup sugar"],
+    "normalized_ingredients": ["egg", "milk", "flour", "sugar"],
+    "instructions": ["Beat eggs with sugar and milk.", "Fold in flour.", "Bake at 350F until golden brown."],
+    "normalized_actions": ["beat", "fold", "bake"],
+    "servings": 6,
+    "prep_time": 15,
+    "cook_time": 30
+  },
+  {
+    "recipe_id": 5,
+    "title": "Banana Oat Smoothie",
+    "ingredients": ["1 ripe banana", "1 cup milk", "0.5 cup oats"],
+    "normalized_ingredients": ["banana", "milk", "oats"],
+    "instructions": ["Place banana, milk, and oats into blender.", "Blend until creamy.", "Pour into glasses and serve."],
+    "normalized_actions": ["blend", "pour"],
+    "servings": 2,
+    "prep_time": 5,
+    "cook_time": 0
+  }
+]
