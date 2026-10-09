@@ -37,6 +37,25 @@ class QuerySpec:
         )
 
 
+import math
+
+def _sanitize_json(obj: Any) -> Any:
+    if isinstance(obj, dict):
+        return {str(k): _sanitize_json(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_sanitize_json(item) for item in obj]
+    elif isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+        return obj
+    elif hasattr(obj, "item"):  # Handles numpy types (np.int64, np.float64, etc.)
+        val = obj.item()
+        if isinstance(val, float) and (math.isnan(val) or math.isinf(val)):
+            return None
+        return val
+    return obj
+
+
 @dataclass
 class RecipeResult:
     title: str
@@ -57,7 +76,7 @@ class RecipeResult:
     answer_raw: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        raw_dict = {
             "title": self.title,
             "ingredients": self.ingredients,
             "instructions": self.instructions,
@@ -84,3 +103,4 @@ class RecipeResult:
                 "cook_time": self.cook_time,
             }
         }
+        return _sanitize_json(raw_dict)

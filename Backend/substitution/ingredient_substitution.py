@@ -1,41 +1,54 @@
 """
-Dynamic USDA & Semantic Ingredient Substitution Engine
+Taste-Aware & Function-Aware Ingredient Substitution Engine
 Finds dynamic ingredient substitutions based on:
-1. Cooking Function
-2. Flavor Profile
-3. Texture Similarity
-4. USDA FoodData Central Nutritional Equivalence (Protein/100g)
-Zero hardcoded ingredient substitution dictionaries.
+1. Taxonomy Category Hierarchy (e.g. Plant Protein, Dairy, Fat/Oil)
+2. Culinary Functional Role (e.g. Binder, Thickener, Fat Source, Protein Base)
+3. Taste & Flavor Profile (e.g. Umami/Savory, Sweet/Creamy, Tangy/Acidic)
+4. Dataset Co-occurrence PPMI Compatibility
 """
 
-from substitution.usda_substitution import get_usda_substitution_advice, USDA_NUTRITION_DATABASE
+from typing import List, Dict, Any, Optional
+from ingredients.ontology import IngredientOntology
 
-def find_substitutes(ingredient_name: str, diet_preference: str = None) -> list:
+_ontology_instance: Optional[IngredientOntology] = None
+
+def get_ontology() -> IngredientOntology:
+    global _ontology_instance
+    if _ontology_instance is None:
+        _ontology_instance = IngredientOntology()
+    return _ontology_instance
+
+
+def find_substitutes(
+    ingredient_name: str,
+    avoided_ingredients: List[str] = None,
+    diet_preference: str = None,
+    compatibility_graph = None
+) -> List[Dict[str, Any]]:
     """
-    Dynamically computes top substitution recommendations for a target ingredient.
+    Dynamically computes top substitution recommendations for a target ingredient using the Ingredient Ontology.
     """
     target = ingredient_name.lower().strip()
-    advice = get_usda_substitution_advice([target], allow_substitutions=True)
+    ontology = get_ontology()
 
-    recommendations = []
-    if advice and isinstance(advice, list):
-        for item in advice:
-            recommendations.append({
-                "original": target,
-                "substitute": item.get("substitute"),
-                "protein_comparison": item.get("protein_comparison"),
-                "flavor_profile": item.get("flavour_profile", "equivalent texture & culinary function"),
-                "reasoning": f"Matches culinary function & nutritional profile ({item.get('protein_comparison', '')})"
-            })
+    ontology_subs = ontology.find_ontology_substitutes(
+        target_ingredient=target,
+        avoided_ingredients=avoided_ingredients,
+        diet_preference=diet_preference,
+        compatibility_graph=compatibility_graph,
+        top_k=4
+    )
 
-    if not recommendations:
-        # Dynamic fallback matching from USDA database by protein & texture similarity
-        recommendations.append({
-            "original": target,
-            "substitute": "Soya Nuggets / Tofu",
-            "protein_comparison": "52.0g / 100g (USDA)",
-            "flavor_profile": "savory / umami",
-            "reasoning": "High protein plant-based substitute matching culinary cooking structure."
-        })
+    if ontology_subs:
+        return ontology_subs
 
-    return recommendations
+    # Generic Fallback if unknown ingredient
+    return [{
+        "original": target,
+        "substitute": "Tofu / Soya Nuggets",
+        "category_match": "plant_protein",
+        "culinary_role": "protein_base / binder",
+        "flavor_profile": "savory / neutral",
+        "reasoning": "High-protein plant-based culinary structure substitute."
+    }]
+

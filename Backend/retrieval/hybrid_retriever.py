@@ -86,17 +86,28 @@ def retrieve_hybrid_rrf(
                 faiss_ranks[f_pos] = rank_count
                 rank_count += 1
 
-    # 3. BM25 Top 30 Search
-    query_tokens = pos_query.lower().split()
+    # 3. BM25 Top Search with Stop Words Filtered
+    STOP_WORDS = {
+        "give", "me", "recipe", "recipes", "using", "for", "with", "show", "find", 
+        "item", "items", "made", "including", "having", "containing", "a", "an", 
+        "the", "in", "of", "and", "or", "to", "create", "invent", "make", "cook", "new"
+    }
+    raw_tokens = pos_query.lower().split()
+    query_tokens = [tok for tok in raw_tokens if tok not in STOP_WORDS]
+    if not query_tokens:
+        query_tokens = raw_tokens
+
     bm25_scores = bm25_model.get_scores(query_tokens)
     top_bm25_positions = np.argsort(bm25_scores)[::-1]
 
     bm25_ranks = {}
     rank_count = 1
-    for b_pos in top_bm25_positions[:100]:
+    for b_pos in top_bm25_positions:
         if b_pos < total_docs and b_pos in candidate_positions:
             bm25_ranks[b_pos] = rank_count
             rank_count += 1
+            if rank_count > 100:
+                break
 
     # 4. Compute RRF Scores
     rrf_scores = {}

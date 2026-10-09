@@ -14,7 +14,7 @@ PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from core.recipe_engine import answer_query, initialize_engine, _df
+import core.recipe_engine as recipe_engine
 from memory.conversation_memory import save_turn, get_recent_history, clear_history
 
 MEMORY_FILE = os.path.join(PROJECT_ROOT, "memory", "user_memory.json")
@@ -25,21 +25,25 @@ CORS(app)
 _server_initialized = False
 
 def _ensure_backend():
-    global _server_initialized
-    if not _server_initialized:
-        initialize_engine()
-        _server_initialized = True
+    if recipe_engine._df is None or len(recipe_engine._df) == 0:
+        recipe_engine.initialize_engine()
 
 
 @app.route("/api/health", methods=["GET"])
 def health():
     try:
         _ensure_backend()
-        dataset_len = len(_df) if _df is not None else 0
+        df = recipe_engine._df
+        dataset_len = len(df) if df is not None else 0
+        ing_idx = recipe_engine._ingredient_index
+        asa_in_idx = ('asafoetida' in ing_idx.index) if ing_idx else False
+        asa_count = len(ing_idx.index.get('asafoetida', [])) if asa_in_idx else 0
         return jsonify({
             "status": "ok",
             "model": "mistral:latest",
             "recipe_count": dataset_len,
+            "asafoetida_in_index": asa_in_idx,
+            "asafoetida_recipe_count": asa_count,
             "message": "Grounded Novel Recipe RAG Server Running"
         })
     except Exception as e:
@@ -61,7 +65,7 @@ def query_recipe():
         _ensure_backend()
 
         # Process via central recipe engine
-        result_dict = answer_query(
+        result_dict = recipe_engine.answer_query(
             query=user_query,
             requested_mode=requested_mode,
             novelty_level=novelty_level
@@ -70,25 +74,28 @@ def query_recipe():
         # Save conversation history turn
         try:
             assistant_summary = f"{result_dict.get('title', '')} ({result_dict.get('mode', 'retrieved')})"
-            save_turn(user_query, assistant_summary, result_dict.get("constraints", {}))
+            save_turn(user_query, assistant_summary, str(result_dict.get("constraints", {})))
         except Exception:
             pass
 
-        return jsonify(result_dict)
+        from core.schemas import _sanitize_json
+        return jsonify(_sanitize_json(result_dict))
 
     except Exception as e:
         import traceback
-        traceback.print_exc()
+        err_msg = traceback.format_exc()
+        print(f"ERROR IN QUERY_RECIPE:\n{err_msg}", flush=True)
         return jsonify({
             "error": "Failed to process recipe query",
             "details": str(e),
+            "traceback": err_msg,
             "query": user_query,
             "mode": "retrieved",
             "recipe": {"title": "Error processing query", "ingredients": [], "instructions": [str(e)]},
             "retrieved_recipes": [],
             "scores": {},
             "provenance": []
-        }), 500
+        })
 
 
 @app.route("/api/memory", methods=["GET"])
@@ -116,4 +123,4 @@ def clear_memory_route():
 if __name__ == "__main__":
     _ensure_backend()
     print("Starting Flask API Server on http://localhost:5000...", flush=True)
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    app.run(host="0.0.0.0", port=5000, debug=False, use_reloader=False)

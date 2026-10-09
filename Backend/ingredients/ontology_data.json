@@ -1,0 +1,77 @@
+{
+  "categories": {
+    "dairy": ["milk", "butter", "yogurt", "paneer", "cream", "cheese", "heavy cream", "cottage cheese", "ghee"],
+    "plant_protein": ["tofu", "soya chunks", "soya nuggets", "chickpeas", "lentils", "black beans", "kidney beans", "peanut", "cashew", "almond", "walnut"],
+    "animal_protein": ["egg", "eggs", "chicken", "chicken breast", "beef", "mutton", "lamb", "prawn", "fish", "salmon", "bacon", "turkey", "ham"],
+    "fat_oil": ["butter", "ghee", "olive oil", "avocado oil", "coconut oil", "vegetable oil", "mustard oil", "sunflower oil", "sesame oil", "lard"],
+    "grain_starch": ["flour", "all purpose flour", "whole wheat flour", "oats", "rice", "cornstarch", "quinoa", "couscous", "semolina", "bread crumbs", "noodle", "pasta"],
+    "sweetener": ["sugar", "brown sugar", "honey", "maple syrup", "stevia", "jaggery", "molasses"],
+    "spice_herb": ["garlic", "ginger", "onion", "turmeric", "cumin", "coriander", "chili powder", "black pepper", "cinnamon", "vanilla", "basil", "oregano", "cilantro", "mint", "thyme", "rosemary", "cardamom", "clove", "star anise", "asafoetida", "hing", "asafetida"],
+    "vegetable": ["tomato", "potato", "onion", "spinach", "broccoli", "carrot", "bell pepper", "mushroom", "button mushroom", "cauliflower", "zucchini", "cucumber", "cabbage", "avocado"],
+    "fruit": ["strawberry", "blueberry", "raspberry", "banana", "apple", "mango", "lemon", "lime", "orange", "pineapple"]
+  },
+  "culinary_roles": {
+    "binder": ["egg", "eggs", "tofu", "mashed banana", "flaxseed", "chia seed", "cornstarch", "flour"],
+    "emulsifier": ["egg", "eggs", "egg yolk", "mustard", "soy lecithin", "mayonnaise"],
+    "thickener": ["flour", "cornstarch", "heavy cream", "yogurt", "greek yogurt", "paneer", "potato", "oats"],
+    "fat_source": ["butter", "ghee", "olive oil", "avocado oil", "coconut oil", "vegetable oil", "heavy cream"],
+    "acid_enhancer": ["lemon", "lime", "lemon juice", "lime juice", "vinegar", "yogurt", "tomato"],
+    "sweetener_role": ["sugar", "brown sugar", "honey", "maple syrup", "jaggery"],
+    "protein_base": ["chicken", "chicken breast", "beef", "mutton", "paneer", "tofu", "soya chunks", "chickpeas", "lentils", "egg", "fish", "salmon"],
+    "aromatic_base": ["onion", "garlic", "ginger", "celery", "shallot", "leek", "asafoetida", "hing"],
+    "primary_flavor": ["strawberry", "blueberry", "cocoa powder", "vanilla", "cinnamon", "curry powder", "mango", "basil"]
+  },
+  "flavor_profiles": {
+    "umami_savory": ["chicken", "beef", "mutton", "mushroom", "button mushroom", "soya chunks", "soy sauce", "cheese", "paneer", "tomato"],
+    "sweet_creamy": ["milk", "heavy cream", "butter", "honey", "sugar", "banana", "strawberry", "vanilla", "coconut milk", "cashew"],
+    "tangy_acidic": ["yogurt", "greek yogurt", "lemon", "lime", "lemon juice", "vinegar", "tomato"],
+    "pungent_spicy": ["garlic", "ginger", "chili powder", "black pepper", "mustard oil", "onion", "clove", "asafoetida", "hing"],
+    "salty_rich": ["butter", "ghee", "bacon", "cheese", "salted butter"],
+    "bitter_earthy": ["spinach", "turmeric", "cumin", "cocoa powder", "walnut", "kale"],
+    "fresh_herbal": ["basil", "mint", "cilantro", "oregano", "thyme", "rosemary"],
+    "nutty": ["almond", "cashew", "peanut", "walnut", "sesame oil", "oats", "quinoa"]
+  },
+  "synonyms": {
+    "asafoetida": ["hing", "asafetida", "compounded asafoetida", "asafoetida powder"],
+    "egg": ["eggs", "whole egg"],
+    "tofu": ["firm tofu", "silken tofu", "soybean curd"],
+    "paneer": ["cottage cheese", "indian cottage cheese"],
+    "soya chunks": ["soya nuggets", "soy protein chunks", "defatted soy flour"],
+    "butter": ["unsalted butter", "salted butter"],
+    "milk": ["whole milk", "full cream milk"],
+    "yogurt": ["curd", "plain yogurt", "greek yogurt"],
+    "lemon": ["lemon juice", "fresh lemon"],
+    "lime": ["lime juice", "key lime"],
+    "strawberry": ["strawberries", "fresh strawberry"],
+    "olive oil": ["extra virgin olive oil"],
+    "chicken": ["chicken breast", "boneless chicken"],
+    "mushroom": ["button mushroom", "cremini mushroom"]
+  },
+  "substitutions": {
+    "egg": [
+      {"name": "tofu", "role": "binder", "flavor": "savory / neutral", "note": "Firm tofu crushed or blended serves as binding and protein match."},
+      {"name": "mashed banana", "role": "binder", "flavor": "sweet_creamy", "note": "1/2 mashed banana per egg for baking applications."},
+      {"name": "cornstarch", "role": "thickener", "flavor": "neutral", "note": "1 tbsp cornstarch + 2 tbsp water as binder/thickener."}
+    ],
+    "milk": [
+      {"name": "soy milk", "role": "thickener", "flavor": "sweet_creamy", "note": "Equal ratio plant milk match."},
+      {"name": "almond milk", "role": "beverage/liquid", "flavor": "nutty", "note": "Light dairy-free liquid substitute."},
+      {"name": "coconut milk", "role": "fat_source", "flavor": "sweet_creamy", "note": "Rich creamy dairy-free substitute."}
+    ],
+    "butter": [
+      {"name": "olive oil", "role": "fat_source", "flavor": "salty_rich", "note": "0.8:1 ratio oil swap for cooking and baking."},
+      {"name": "ghee", "role": "fat_source", "flavor": "salty_rich", "note": "Clarified butter substitute with high smoke point."},
+      {"name": "avocado oil", "role": "fat_source", "flavor": "salty_rich", "note": "Neutral high heat cooking fat."}
+    ],
+    "chicken": [
+      {"name": "soya chunks", "role": "protein_base", "flavor": "umami_savory", "note": "High-protein plant substitute with meaty texture."},
+      {"name": "paneer", "role": "protein_base", "flavor": "umami_savory", "note": "Rich vegetarian protein substitute."},
+      {"name": "tofu", "role": "protein_base", "flavor": "umami_savory", "note": "Versatile plant protein option."},
+      {"name": "button mushroom", "role": "primary_flavor", "flavor": "umami_savory", "note": "Umami-rich texture substitute for meat."}
+    ],
+    "yogurt": [
+      {"name": "paneer", "role": "protein_base", "flavor": "tangy_acidic", "note": "Dairy-based protein & texture substitute."},
+      {"name": "soy yogurt", "role": "acid_enhancer", "flavor": "tangy_acidic", "note": "Plant-based tangy yogurt substitute."}
+    ]
+  }
+}

@@ -39,11 +39,10 @@ def compute_novelty_score(
         for ing in norm_ings:
             if ing in ingredient_index.index:
                 rec_ids.update(ingredient_index.index[ing])
-        # Map IDs to positions
-        for pos, row in df.iterrows():
-            r_id = row.get("recipe_id", pos)
-            if r_id in rec_ids:
-                comparison_pos.append(pos)
+        if "recipe_id" in df.columns:
+            comparison_pos = df.index[df["recipe_id"].isin(rec_ids)].tolist()[:300]
+        else:
+            comparison_pos = [pos for pos in rec_ids if pos < len(df)][:300]
 
     if not comparison_pos:
         comparison_pos = list(range(min(500, len(df))))

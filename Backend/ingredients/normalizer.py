@@ -27,6 +27,12 @@ ALIAS_MAP = {
     "unsalted butter": "butter",
     "salted butter": "butter",
     "extra virgin olive oil": "olive oil",
+    "asafetida": "asafoetida",
+    "hing": "asafoetida",
+    "compounded asafoetida": "asafoetida",
+    "asafoetida powder": "asafoetida",
+    "peenut butter": "peanut butter",
+    "smotthie": "smoothie",
 }
 
 # Measurement units to strip out
@@ -45,7 +51,8 @@ DESCRIPTORS = {
     "whole", "unsalted", "salted", "extra", "virgin", "organic", "skimmed", "skim",
     "chopped", "diced", "minced", "sliced", "peeled", "crushed", "melted", "warm",
     "cold", "hot", "small", "medium", "large", "finely", "coarsely", "pureed",
-    "canned", "packed", "toasted", "roasted", "boiled", "fried", "baked", "softened"
+    "canned", "packed", "toasted", "roasted", "boiled", "fried", "baked", "softened",
+    "using", "with", "made", "including", "having", "containing", "recipe", "recipes", "item", "items"
 }
 
 

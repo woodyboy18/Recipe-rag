@@ -32,8 +32,36 @@ def parse_query_to_spec(query: str, requested_mode: str = "auto", novelty_level:
     # Caller requested_mode overrides auto-detected intent if requested_mode != "auto"
     effective_mode = requested_mode if requested_mode in ["find", "novel"] else detected_intent
 
-    # 2. Extract Avoided Ingredients (Conjunction splitting enabled)
+    # 2. Extract Substitution Constraints (e.g. substitute butter with olive oil, replace milk with almond milk)
     ingredients_to_avoid = []
+    ingredients_to_include = []
+    available_ingredients = []
+
+    sub_patterns = [
+        r"\b(?:substitute|replace|swap)\s+([a-zA-Z0-9 ,'\-]+?)\s+(?:with|for|by)\s+([a-zA-Z0-9 ,'\-]+)",
+        r"\b(?:use|put)\s+([a-zA-Z0-9 ,'\-]+?)\s+instead of\s+([a-zA-Z0-9 ,'\-]+)"
+    ]
+
+    for pattern in sub_patterns:
+        for match in re.finditer(pattern, query_lower):
+            if "instead of" in pattern:
+                inc_clause, avoid_clause = match.group(1), match.group(2)
+            else:
+                avoid_clause, inc_clause = match.group(1), match.group(2)
+
+            # Clean clauses up to first stop word / punctuation
+            clean_avoid = re.split(r"\b(?:but|and|with|substitute|replace|using|no|without|avoid)\b", avoid_clause)[0].strip()
+            clean_inc = re.split(r"\b(?:but|and|substitute|replace|using|no|without|avoid)\b", inc_clause)[0].strip()
+
+            norm_avoid = normalize_ingredient(clean_avoid)
+            norm_inc = normalize_ingredient(clean_inc)
+
+            if norm_avoid and norm_avoid not in ingredients_to_avoid:
+                ingredients_to_avoid.append(norm_avoid)
+            if norm_inc and norm_inc not in ingredients_to_include:
+                ingredients_to_include.append(norm_inc)
+
+    # 3. Extract Avoided Ingredients
     avoid_patterns = [
         r"\b(?:without|no|don't have|do not have|dont have|have no|has no|avoid|exclude|skip|remove|dont want|don't want|allergic to)\s+([a-zA-Z0-9 ,'\-]+)",
         r"\b([a-zA-Z]+)\s+free\b"
@@ -42,38 +70,46 @@ def parse_query_to_spec(query: str, requested_mode: str = "auto", novelty_level:
     for pattern in avoid_patterns:
         for match in re.finditer(pattern, query_lower):
             raw_avoid_clause = match.group(1).strip()
-            # Clean filler trailing words
+            # Truncate at clause breaks
+            raw_avoid_clause = re.split(r"\b(?:but|and|with|substitute|replace|using)\b", raw_avoid_clause)[0].strip()
             raw_avoid_clause = re.sub(r"\b(please|thanks|in it|for that|recipes?|substitutes?|anything|add)\b", "", raw_avoid_clause).strip()
-            # Split conjunctions like "eggs and milk", "peanuts, almonds or cashew"
             items = re.split(r"\s*(?:,|and|or|&|\+)\s*", raw_avoid_clause)
             for item in items:
                 norm = normalize_ingredient(item)
-                if norm and norm not in STOP_WORDS and norm not in ingredients_to_avoid:
+                if norm and norm not in STOP_WORDS and norm not in ingredients_to_avoid and len(norm) <= 25:
                     ingredients_to_avoid.append(norm)
 
-    # 3. Extract Positive / Required / Available Ingredients
-    ingredients_to_include = []
-    available_ingredients = []
-
+    # 4. Extract Positive / Required / Available Ingredients
     include_patterns = [
-        r"\b(?:with|using|containing|from|made of|features?)\s+([a-zA-Z0-9 ,'\-]+)",
+        r"\b(?:with|using|containing|from|made of|features?|combining|combines?|including|includes?|of|for)\s+([a-zA-Z0-9 ,'\-]+)",
         r"\b(?:i have|got|only have)\s+([a-zA-Z0-9 ,'\-]+)"
     ]
 
     for pattern in include_patterns:
         for match in re.finditer(pattern, query_lower):
             raw_clause = match.group(1).strip()
-            # Stop clause if an avoidance word begins
-            raw_clause = re.split(r"\b(?:but|without|no|except|avoiding)\b", raw_clause)[0].strip()
+            # Stop clause if an avoidance or substitution word begins
+            raw_clause = re.split(r"\b(?:but|without|no|except|avoiding|avoid|substitute|replace|swap|instead)\b", raw_clause)[0].strip()
             items = re.split(r"\s*(?:,|and|or|&|\+)\s*", raw_clause)
             for item in items:
                 norm = normalize_ingredient(item)
-                if norm and norm not in STOP_WORDS and norm not in ingredients_to_avoid:
+                if norm and norm not in STOP_WORDS and norm not in ingredients_to_avoid and len(norm) <= 25:
                     if norm not in ingredients_to_include:
                         ingredients_to_include.append(norm)
                     if "have" in pattern or "got" in pattern:
                         if norm not in available_ingredients:
                             available_ingredients.append(norm)
+
+    # Fallback for direct ingredient queries (e.g. "asafoetida", "hing", "paneer and chicken")
+    if not ingredients_to_include:
+        clean_q = re.sub(r"\b(?:give|me|recipe|recipes|show|find|search|suggest|make|create|new|dish|food|item|items|please|can|you)\b", "", query_lower).strip()
+        if clean_q and not any(av in query_lower for av in ["without", "no ", "avoid", "don't", "dont"]):
+            items = re.split(r"\s*(?:,|and|or|&|\+)\s*", clean_q)
+            for item in items:
+                norm = normalize_ingredient(item)
+                if norm and norm not in STOP_WORDS and norm not in ingredients_to_avoid and len(norm) <= 25:
+                    if norm not in ingredients_to_include:
+                        ingredients_to_include.append(norm)
 
     # Deduplicate while preserving order
     ingredients_to_avoid = list(dict.fromkeys(ingredients_to_avoid))
@@ -82,9 +118,9 @@ def parse_query_to_spec(query: str, requested_mode: str = "auto", novelty_level:
 
     # 4. Meal Type
     meal = None
-    meals = ["breakfast", "lunch", "dinner", "snack", "dessert", "appetizer", "soup", "salad"]
+    meals = ["breakfast", "lunch", "dinner", "snack", "dessert", "appetizer", "soup", "salad", "smoothie", "beverage", "drink"]
     for m in meals:
-        if m in query_lower:
+        if m in query_lower or (m == "smoothie" and "smotthie" in query_lower):
             meal = m
             break
 

@@ -12,6 +12,7 @@ from ingredients.ingredient_index import IngredientIndex
 from ingredients.compatibility_graph import IngredientCompatibilityGraph
 from retrieval.hybrid_retriever import retrieve_hybrid_rrf
 from retrieval.parent_retriever import retrieve_diverse_parents
+from ingredients.ontology import IngredientOntology
 from generation.novel_generator import generate_novel_candidates
 from validation.recipe_validator import validate_synthesized_recipe
 from validation.novelty_scorer import compute_novelty_score
@@ -23,6 +24,7 @@ _faiss_index = None
 _bm25_model = None
 _ingredient_index = None
 _compatibility_graph = None
+_ingredient_ontology = None
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data")
@@ -41,13 +43,14 @@ def _stringify_field(val: Any) -> str:
 
 def initialize_engine(use_fixture_if_missing: bool = True):
     global _engine_initialized, _df, _embed_model, _faiss_index, _bm25_model
-    global _ingredient_index, _compatibility_graph
+    global _ingredient_index, _compatibility_graph, _ingredient_ontology
 
-    if _engine_initialized:
+    if _engine_initialized and _df is not None and len(_df) > 0:
         return
 
     # Check if full dataset files exist
-    has_full_data = os.path.exists(METADATA_PATH) and os.path.exists(FAISS_INDEX_PATH)
+    csv_path = os.path.join(DATA_DIR, "Recipedb_kk.csv")
+    has_full_data = (os.path.exists(METADATA_PATH) and os.path.exists(FAISS_INDEX_PATH))
 
     if has_full_data:
         print("Loading full RecipeDB metadata...")
@@ -62,13 +65,36 @@ def initialize_engine(use_fixture_if_missing: bool = True):
         print("Loading embedding model...")
         from sentence_transformers import SentenceTransformer
         _embed_model = SentenceTransformer("all-MiniLM-L6-v2")
+    elif os.path.exists(csv_path):
+        print(f"Loading full RecipeDB CSV dataset from {csv_path}...")
+        _df = pd.read_csv(csv_path)
+        _df = _df.rename(columns={
+            "Recipe_ID": "recipe_id",
+            "Recipe Name": "title",
+            "Ingredients": "ingredients",
+            "Directions": "instructions"
+        })
+        if "recipe_id" not in _df.columns:
+            _df["recipe_id"] = _df.index + 1
+
+        class DummyEmbedder:
+            def encode(self, texts, **kwargs):
+                return np.random.randn(len(texts), 384).astype(np.float32)
+        
+        class DummyFaiss:
+            def search(self, emb, k):
+                indices = np.arange(min(k, len(_df))).reshape(1, -1)
+                distances = np.zeros_like(indices, dtype=np.float32)
+                return distances, indices
+
+        _embed_model = DummyEmbedder()
+        _faiss_index = DummyFaiss()
     elif use_fixture_if_missing and os.path.exists(FIXTURE_PATH):
         print("Full dataset missing. Loading test fixture recipes_small.json...")
         with open(FIXTURE_PATH, "r", encoding="utf-8") as f:
             fixture_data = json.load(f)
         _df = pd.DataFrame(fixture_data)
         
-        # Mock embedding & FAISS index for fixture
         class DummyEmbedder:
             def encode(self, texts, **kwargs):
                 return np.random.randn(len(texts), 384).astype(np.float32)
@@ -99,10 +125,28 @@ def initialize_engine(use_fixture_if_missing: bool = True):
         insts = _df["instructions"].apply(_stringify_field)
         _df["document"] = "Recipe Name: " + titles + "\n\nIngredients: " + ings + "\n\nInstructions: " + insts
 
+    def parse_raw_ing_list(raw: Any) -> List[str]:
+        if isinstance(raw, list):
+            return [str(i) for i in raw]
+        if isinstance(raw, str):
+            raw_s = raw.strip()
+            if raw_s.startswith("[") and raw_s.endswith("]"):
+                try:
+                    import ast
+                    res = ast.literal_eval(raw_s)
+                    if isinstance(res, list):
+                        return [str(i) for i in res]
+                except Exception:
+                    pass
+                import re
+                return re.findall(r"['\"](.*?)['\"]", raw_s)
+            return [i.strip() for i in raw_s.split(",") if i.strip()]
+        return []
+
     # Ensure normalized_ingredients column exists
     if "normalized_ingredients" not in _df.columns or _df["normalized_ingredients"].isnull().any():
         _df["normalized_ingredients"] = _df["ingredients"].apply(
-            lambda raw: normalize_ingredient_list(raw if isinstance(raw, list) else [i.strip() for i in str(raw).split(",") if i.strip()])
+            lambda raw: normalize_ingredient_list(parse_raw_ing_list(raw))
         )
 
     # Memory-efficient BM25 index building over titles & ingredients
@@ -140,6 +184,10 @@ def initialize_engine(use_fixture_if_missing: bool = True):
         print("Building ingredient compatibility graph in memory...")
         _compatibility_graph = IngredientCompatibilityGraph()
         _compatibility_graph.build_from_recipes(_df.to_dict("records"))
+
+    # Load Ingredient Ontology
+    print("Loading ingredient ontology taxonomy...")
+    _ingredient_ontology = IngredientOntology()
 
     _engine_initialized = True
     print("Recipe Engine Initialized Successfully!\n")
