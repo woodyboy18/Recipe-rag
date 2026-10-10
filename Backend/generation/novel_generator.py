@@ -6,7 +6,7 @@ from generation.output_parser import parse_recipe_json
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
 
-def call_ollama_raw(prompt: str, temperature: float = 0.6, num_predict: int = 750, timeout: float = 1.5) -> str:
+def call_ollama_raw(prompt: str, temperature: float = 0.6, num_predict: int = 750, timeout: float = 30.0) -> str:
     models_to_try = ["phi:latest", "gemma3:1b"]
     for model_name in models_to_try:
         payload = {
@@ -45,7 +45,7 @@ def generate_novel_candidates(
     for idx in range(num_candidates):
         # Slightly alter temperature for candidate diversity across calls
         temp = 0.55 + (idx * 0.1)
-        raw_resp = call_ollama_raw(prompt, temperature=temp, num_predict=750, timeout=2)
+        raw_resp = call_ollama_raw(prompt, temperature=temp, num_predict=750, timeout=30.0)
 
         if not raw_resp:
             if idx == 0:
@@ -57,7 +57,7 @@ def generate_novel_candidates(
         # 1-Shot Repair Request if parsing failed
         if not parsed:
             repair_p = build_repair_prompt(raw_resp, "Invalid JSON structure or missing mandatory fields")
-            repaired_resp = call_ollama_raw(repair_p, temperature=0.2, num_predict=750, timeout=2)
+            repaired_resp = call_ollama_raw(repair_p, temperature=0.2, num_predict=750, timeout=30.0)
             if repaired_resp:
                 parsed = parse_recipe_json(repaired_resp)
                 if parsed:

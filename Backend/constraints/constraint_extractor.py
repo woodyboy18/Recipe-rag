@@ -81,7 +81,7 @@ def parse_query_to_spec(query: str, requested_mode: str = "auto", novelty_level:
 
     # 4. Extract Positive / Required / Available Ingredients
     include_patterns = [
-        r"\b(?:with|using|containing|from|made of|features?|combining|combines?|including|includes?|of|for)\s+([a-zA-Z0-9 ,'\-]+)",
+        r"\b(?:with|using|containing|from|made of|features?|combining|combines?|including|includes?)\s+([a-zA-Z0-9 ,'\-]+)",
         r"\b(?:i have|got|only have)\s+([a-zA-Z0-9 ,'\-]+)"
     ]
 
@@ -102,13 +102,19 @@ def parse_query_to_spec(query: str, requested_mode: str = "auto", novelty_level:
 
     # Fallback for direct ingredient queries (e.g. "asafoetida", "hing", "paneer and chicken")
     if not ingredients_to_include:
-        clean_q = re.sub(r"\b(?:give|me|recipe|recipes|show|find|search|suggest|make|create|new|dish|food|item|items|please|can|you)\b", "", query_lower).strip()
+        clean_q = re.sub(r"\b(?:give|me|recipe|recipes|show|find|search|suggest|make|create|new|dish|food|item|items|please|can|you|for|a|an|the)\b", "", query_lower).strip()
         if clean_q and not any(av in query_lower for av in ["without", "no ", "avoid", "don't", "dont"]):
-            items = re.split(r"\s*(?:,|and|or|&|\+)\s*", clean_q)
-            for item in items:
-                norm = normalize_ingredient(item)
+            if any(sep in clean_q for sep in [",", " and ", " or ", " & ", " + "]):
+                items = re.split(r"\s*(?:,|and|or|&|\+)\s*", clean_q)
+                for item in items:
+                    norm = normalize_ingredient(item)
+                    if norm and norm not in STOP_WORDS and norm not in ingredients_to_avoid and len(norm) <= 25:
+                        if norm not in ingredients_to_include:
+                            ingredients_to_include.append(norm)
+            else:
+                norm = normalize_ingredient(clean_q)
                 if norm and norm not in STOP_WORDS and norm not in ingredients_to_avoid and len(norm) <= 25:
-                    if norm not in ingredients_to_include:
+                    if len(norm.split()) == 1:
                         ingredients_to_include.append(norm)
 
     # Deduplicate while preserving order

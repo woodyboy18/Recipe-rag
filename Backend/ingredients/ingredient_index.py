@@ -63,13 +63,16 @@ class IngredientIndex:
                 if ing in self.index:
                     sets_to_intersect.append(self.index[ing])
                 else:
-                    # Required ingredient doesn't exist in dataset -> no exact candidate matches
-                    return set()
+                    # Check if splitting ing into sub-tokens yields any known ingredients in self.index
+                    sub_tokens = [t for t in ing.split() if t in self.index]
+                    if sub_tokens:
+                        for st in sub_tokens:
+                            sets_to_intersect.append(self.index[st])
 
             if sets_to_intersect:
                 candidate_ids = set.intersection(*sets_to_intersect)
             else:
-                return set()
+                candidate_ids = set(all_recipe_ids) if all_recipe_ids is not None else set(self.recipe_ingredients.keys())
 
         # Remove candidates containing any avoided ingredient
         if avoid_norm and candidate_ids:
