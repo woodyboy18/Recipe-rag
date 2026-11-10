@@ -18,6 +18,7 @@ import sys
 import json
 import csv
 import math
+import re
 import argparse
 from datetime import datetime
 from typing import List, Dict, Any, Tuple, Optional
@@ -39,7 +40,7 @@ from evaluation.batch_evaluator import load_recipes_for_evaluation, compute_stat
 class HuggingFaceJudge:
     def __init__(
         self,
-        model_name_or_path: str = "Qwen/Qwen2.5-32B-Instruct-AWQ",
+        model_name_or_path: str = "mistralai/Mistral-7B-Instruct-v0.1",
         device: str = "cuda",
         torch_dtype = torch.float16
     ):
@@ -70,7 +71,6 @@ class HuggingFaceJudge:
         # Map score tokens '1', '2', '3', '4', '5' to tokenizer IDs
         self.score_token_ids = {}
         for i in range(1, 6):
-            # Probe single digit tokens with and without leading space
             ids = self.tokenizer.encode(str(i), add_special_tokens=False)
             if ids:
                 self.score_token_ids[i] = ids[-1]
@@ -82,8 +82,8 @@ class HuggingFaceJudge:
     ) -> Tuple[str, Optional[Dict[int, float]]]:
         """
         Generates text and computes token probabilities over candidate score tokens [1..5].
+        Searches backwards from the end of the text to target the score token after 'Score:'.
         """
-        # Apply model chat template if available
         if hasattr(self.tokenizer, "apply_chat_template") and self.tokenizer.chat_template:
             messages = [{"role": "user", "content": prompt}]
             formatted_input = self.tokenizer.apply_chat_template(
@@ -110,27 +110,33 @@ class HuggingFaceJudge:
         gen_tokens = outputs.sequences[0, input_len:]
         response_text = self.tokenizer.decode(gen_tokens, skip_special_tokens=True).strip()
 
-        # Extract probability distribution over candidate score tokens [1..5]
-        # Locate score token index in generated sequence
+        # Locate the TRUE score token (searching backwards from the end of the response)
         score_probs = None
-        if outputs.scores:
-            # Check logits of the output sequence for score integers
-            for step_idx, step_logits in enumerate(outputs.scores):
-                # Check if generated token is a score digit
-                tok_id = gen_tokens[step_idx].item()
-                tok_str = self.tokenizer.decode([tok_id]).strip()
+        if outputs.scores and len(outputs.scores) == len(gen_tokens):
+            decoded_tokens = [self.tokenizer.decode([t.item()]).strip() for t in gen_tokens]
+            
+            # Find the last occurrence of a digit 1..5 that appears after "Score"
+            target_idx = None
+            for idx in range(len(decoded_tokens) - 1, -1, -1):
+                tok_str = decoded_tokens[idx]
                 if tok_str in ["1", "2", "3", "4", "5"]:
-                    # Isolate logits for 1..5
-                    cand_logits = {}
-                    for score_int, tid in self.score_token_ids.items():
-                        cand_logits[score_int] = step_logits[0, tid].item()
-                    
-                    # Softmax normalization
-                    max_l = max(cand_logits.values())
-                    exp_sum = sum(math.exp(l - max_l) for l in cand_logits.values())
-                    if exp_sum > 0:
-                        score_probs = {k: math.exp(v - max_l) / exp_sum for k, v in cand_logits.items()}
-                    break
+                    # Check if preceded by 'score' or ':' in recent window
+                    recent_ctx = "".join(decoded_tokens[max(0, idx - 6):idx]).lower()
+                    if "score" in recent_ctx or ":" in recent_ctx or idx >= len(decoded_tokens) - 8:
+                        target_idx = idx
+                        break
+
+            if target_idx is not None:
+                step_logits = outputs.scores[target_idx]
+                cand_logits = {}
+                for score_int, tid in self.score_token_ids.items():
+                    cand_logits[score_int] = step_logits[0, tid].item()
+                
+                # Softmax normalization
+                max_l = max(cand_logits.values())
+                exp_sum = sum(math.exp(l - max_l) for l in cand_logits.values())
+                if exp_sum > 0:
+                    score_probs = {k: math.exp(v - max_l) / exp_sum for k, v in cand_logits.items()}
 
         return response_text, score_probs
 
@@ -150,25 +156,36 @@ class HuggingFaceJudge:
         try:
             resp_text, score_probs = self._generate_response_with_logits(prompt, max_new_tokens=600)
             
-            # Compute expectation if logits were extracted
-            expected_score = None
-            if score_probs:
-                e_s = sum(score_val * prob for score_val, prob in score_probs.items())
-                # Normalize 1..5 scale to [0.0, 1.0]
-                expected_score = max(0.0, min(1.0, round((e_s - 1.0) / 4.0, 4)))
-
-            # Parse reason, evidence, issues, and fallback score from text
+            # 1. Parse text directly for score fallback, reason, evidence, issues
             from evaluation.llm_judge import LLMJudge
             parsed_score, reason, evidence, issues = LLMJudge._parse_single_metric_response(resp_text)
 
-            final_score = expected_score if expected_score is not None else (parsed_score if parsed_score is not None else 0.5)
+            # 2. Compute probability expectation if logits were isolated around the Score token
+            expected_score = None
+            if score_probs:
+                e_s = sum(score_val * prob for score_val, prob in score_probs.items())
+                expected_score = max(0.0, min(1.0, round((e_s - 1.0) / 4.0, 4)))
+
+            # If logprob expectation seems valid and consistent with text, use it; else use parsed score
+            if expected_score is not None and expected_score > 0.05:
+                final_score = expected_score
+                method = "native_hf_geval_expectation"
+            elif parsed_score is not None:
+                final_score = parsed_score
+                method = "native_hf_cot_parsed"
+            elif expected_score is not None:
+                final_score = expected_score
+                method = "native_hf_geval_expectation"
+            else:
+                final_score = 0.50
+                method = "neutral_fallback"
 
             return {
                 "score": final_score,
                 "reason": reason,
                 "evidence": evidence,
                 "issues": issues,
-                "method": "native_hf_geval_expectation" if expected_score is not None else "native_hf_cot_parsed"
+                "method": method
             }
         except Exception as e:
             return {
@@ -350,7 +367,7 @@ if __name__ == "__main__":
                         help="Path to novel recipes JSON or JSONL file.")
     parser.add_argument("--output", default=os.path.join(PROJECT_ROOT, "evaluation", "results"),
                         help="Directory to save evaluation results.")
-    parser.add_argument("--model", default="Qwen/Qwen2.5-32B-Instruct-AWQ",
+    parser.add_argument("--model", default="mistralai/Mistral-7B-Instruct-v0.1",
                         help="Hugging Face model identifier or local path.")
     parser.add_argument("--limit", type=int, default=None,
                         help="Limit number of recipes to evaluate.")
