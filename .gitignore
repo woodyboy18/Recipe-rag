@@ -43,7 +43,6 @@ Thumbs.db
 
 # Local memory / cache
 Backend/cache/*
-Backend/memory/user_memory.json
 
 # Local model / large files
 *.gguf
@@ -53,3 +52,10 @@ Backend/memory/user_memory.json
 # Temporary files
 *.save
 *.bak
+
+# Large indexes and binary pickles (prevent GitHub 100MB limit errors)
+*.index
+*.pkl
+Backend/data/*.csv
+Backend/data/*.index
+Backend/data/*.pkl

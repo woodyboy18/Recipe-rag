@@ -74,7 +74,22 @@ def query_recipe():
         # Save conversation history turn
         try:
             assistant_summary = f"{result_dict.get('title', '')} ({result_dict.get('mode', 'retrieved')})"
-            save_turn(user_query, assistant_summary, str(result_dict.get("constraints", {})))
+            recipe_payload = {
+                "title": result_dict.get("title", ""),
+                "ingredients": result_dict.get("ingredients", []),
+                "instructions": result_dict.get("instructions", []),
+                "servings": result_dict.get("servings", 2),
+                "prep_time": result_dict.get("prep_time", 10),
+                "cook_time": result_dict.get("cook_time", 15),
+                "mode": result_dict.get("mode", "retrieved")
+            }
+            save_turn(
+                user_query=user_query,
+                assistant_response=assistant_summary,
+                constraints=str(result_dict.get("constraints", {})),
+                recipe_details=recipe_payload,
+                retrieved_recipes=result_dict.get("retrieved_recipes", [])
+            )
         except Exception:
             pass
 
