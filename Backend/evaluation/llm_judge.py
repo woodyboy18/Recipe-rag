@@ -2,7 +2,8 @@
 Model-Agnostic LLM-as-a-Judge Evaluation Module
 Strictly implements the G-Eval framework (Liu et al., 2023)
 Supports:
-- vLLM serving OpenAI-compatible endpoints with logprobs extraction
+- vLLM serving OpenAI-compatible endpoints with logprobs extraction (port 8000)
+- Ollama native endpoints (/api/chat and /api/generate on port 11434, compatible with all Ollama versions)
 - Chain-of-Thought (CoT) step verification
 - Mathematical expectation scoring: E[s] = sum(s * p(s)) normalized to [0.0, 1.0]
 - Fallback JSON parsing and schema validation
@@ -46,7 +47,7 @@ class LLMJudge:
         api_base: str = DEFAULT_VLLM_API_BASE,
         api_key: str = DEFAULT_API_KEY,
         use_strict_logprobs: bool = True,
-        timeout: float = 60.0
+        timeout: float = 180.0
     ):
         self.model_name = model_name
         self.api_base = api_base.rstrip("/")
@@ -74,9 +75,55 @@ class LLMJudge:
         top_logprobs: int = 10
     ) -> Dict[str, Any]:
         """
-        Calls OpenAI-compatible /v1/chat/completions endpoint.
-        Gracefully handles official OpenAI client, requests, or standard library urllib.
+        Calls evaluation endpoint.
+        Automatically adapts to:
+        1. Native Ollama (/api/chat and /api/generate) for any Ollama version on port 11434
+        2. OpenAI-compatible vLLM endpoints (/v1/chat/completions) on port 8000
         """
+        is_ollama = "11434" in self.api_base or "ollama" in self.api_base.lower()
+
+        # ROUTE 1: NATIVE OLLAMA API (Compatible with ALL Ollama versions including 0.1.23)
+        if is_ollama:
+            host_root = self.api_base.replace("/v1", "").rstrip("/")
+            
+            # Try native Ollama /api/chat
+            chat_url = f"{host_root}/api/chat"
+            chat_payload = {
+                "model": self.model_name,
+                "messages": [{"role": "user", "content": prompt}],
+                "stream": False,
+                "options": {
+                    "temperature": temperature,
+                    "num_predict": max_tokens
+                }
+            }
+            try:
+                req_data = json.dumps(chat_payload).encode("utf-8")
+                req = urllib.request.Request(chat_url, data=req_data, headers={"Content-Type": "application/json"}, method="POST")
+                with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                    res_json = json.loads(resp.read().decode("utf-8"))
+                    text = res_json.get("message", {}).get("content", "")
+                    return {"choices": [{"message": {"content": text}}]}
+            except Exception:
+                # Fallback to native Ollama /api/generate
+                gen_url = f"{host_root}/api/generate"
+                gen_payload = {
+                    "model": self.model_name,
+                    "prompt": prompt,
+                    "stream": False,
+                    "options": {
+                        "temperature": temperature,
+                        "num_predict": max_tokens
+                    }
+                }
+                req_data = json.dumps(gen_payload).encode("utf-8")
+                req = urllib.request.Request(gen_url, data=req_data, headers={"Content-Type": "application/json"}, method="POST")
+                with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                    res_json = json.loads(resp.read().decode("utf-8"))
+                    text = res_json.get("response", "")
+                    return {"choices": [{"message": {"content": text}}]}
+
+        # ROUTE 2: OPENAI-COMPATIBLE VLLM API (port 8000)
         payload = {
             "model": self.model_name,
             "messages": [
@@ -113,16 +160,10 @@ class LLMJudge:
         }
         url = f"{self.api_base}/chat/completions"
 
-        if requests is not None:
-            r = requests.post(url, json=payload, headers=headers, timeout=self.timeout)
-            r.raise_for_status()
-            return r.json()
-        else:
-            req_data = json.dumps(payload).encode("utf-8")
-            req = urllib.request.Request(url, data=req_data, headers=headers, method="POST")
-            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
-                resp_bytes = resp.read()
-                return json.loads(resp_bytes.decode("utf-8"))
+        req_data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(url, data=req_data, headers=headers, method="POST")
+        with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+            return json.loads(resp.read().decode("utf-8"))
 
     # ==========================================================================
     # STRICT G-EVAL LOGPROB EXPECTATION CALCULATION
@@ -213,7 +254,7 @@ class LLMJudge:
             lines = [l.strip("- *").strip() for l in issues_match.group(1).strip().split("\n") if l.strip("- *").strip()]
             issues = [l for l in lines if l.lower() not in ["none", "none.", "n/a", "no issues"]]
 
-        # Extract Score integer fallback
+        # Extract Score integer fallback (1 to 5)
         score_match = re.search(r"Score:\s*(\d(?:\.\d+)?)", text, re.IGNORECASE)
         if score_match:
             raw_num = float(score_match.group(1))
@@ -312,7 +353,7 @@ class LLMJudge:
         timestamp = datetime.utcnow().isoformat() + "Z"
 
         if fast_mode:
-            # Single-call unified JSON evaluation
+            # Single-pass unified JSON evaluation
             prompt = build_unified_geval_prompt(user_query, retrieved_recipes, generated_recipe)
             try:
                 resp = self._call_completions_api(prompt, temperature=0.0, max_tokens=900)
